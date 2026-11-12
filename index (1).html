@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECO-MAPA | Sistema de Monitoreo Ambiental y Residuos</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --bg-body: #f4f6f9;
+            --bg-navbar: #0f172a;
+            --bg-panel: #ffffff;
+            --bg-card: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-dark: #0f172a;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --accent-green: #15803d;
+            --accent-blue: #0284c7;
+            --danger: #dc2626;
+            --danger-bg: #fee2e2;
+            --warning: #d97706;
+            --warning-bg: #fef3c7;
+            --info: #2563eb;
+            --info-bg: #dbeafe;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; background-color: var(--bg-body); color: var(--text-main); overflow: hidden; }
+
+        /* MODAL LOGIN ELEGANTE */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(6px);
+            z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 16px;
+        }
+        .login-card {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            text-align: center; color: var(--text-dark);
+        }
+        .brand-title { font-size: 1.4rem; font-weight: 800; color: var(--accent-green); margin-bottom: 4px; letter-spacing: -0.5px; }
+        .login-card p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px; }
+        .social-login { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .btn-social {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; padding: 11px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+            border: 1px solid var(--border-color); background: #ffffff; color: var(--text-dark); cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-social:hover { background: #f1f5f9; }
+        .divider { display: flex; align-items: center; margin: 18px 0; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
+        .divider::before, .divider::after { content: ""; flex: 1; border-bottom: 1px solid var(--border-color); }
+        .divider span { padding: 0 10px; }
+
+        /* BARRA SUPERIOR INSTITUCIONAL */
+        #navbar-top {
+            height: 56px; background: var(--bg-navbar); border-bottom: 1px solid #1e293b;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+            z-index: 2000; position: relative; flex-shrink: 0;
+        }
+        .nav-brand { font-weight: 800; font-size: 1.1rem; color: #ffffff; letter-spacing: -0.5px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .nav-brand span { color: #4ade80; }
+        
+        .nav-menu { display: flex; gap: 2px; height: 100%; align-items: center; }
+        .nav-item-wrapper { position: relative; height: 100%; display: flex; align-items: center; }
+        
+        .nav-button {
+            background: transparent; color: #94a3b8; border: none; font-size: 0.82rem; font-weight: 600;
+            padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+        }
+        .nav-button:hover, .nav-item-wrapper:hover .nav-button { color: #ffffff; background: rgba(255,255,255,0.08); }
+        .nav-item-wrapper.active .nav-button { background: var(--accent-green); color: #ffffff; }
+
+        /* MENÚ DESPLEGABLE */
+        .dropdown-menu {
+            position: absolute; top: 56px; left: 0; min-width: 250px;
+            background: #ffffff; border: 1px solid var(--border-color);
+            border-radius: 0 0 8px 8px; padding: 8px 0; box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+            display: none; flex-direction: column; z-index: 2500;
+        }
+        .nav-item-wrapper:hover .dropdown-menu { display: flex; }
+        
+        .dropdown-item {
+            padding: 10px 16px; color: var(--text-dark); text-decoration: none; font-size: 0.82rem;
+            cursor: pointer; transition: background 0.15s, color 0.15s; text-align: left; background: none; border: none; width: 100%;
+            font-weight: 500;
+        }
+        .dropdown-item:hover { background: #f0fdf4; color: var(--accent-green); font-weight: 600; }
+
+        /* CONTENEDOR PRINCIPAL */
+        #main-layout { display: flex; flex: 1; height: calc(100vh - 56px); position: relative; overflow: hidden; }
+
+        /* PANEL LATERAL DE IZQUIERDA */
+        #sidebar {
+            width: 380px; background: var(--bg-panel);
+            display: flex; flex-direction: column; border-right: 1px solid var(--border-color);
+            z-index: 1000; padding: 14px; gap: 12px; height: 100%; box-shadow: 2px 0 8px rgba(0,0,0,0.03);
+            flex-shrink: 0; transition: transform 0.3s ease;
+        }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex-shrink: 0; }
+        .stat-card {
+            background: var(--bg-card); padding: 10px 4px; border-radius: 8px;
+            border: 1px solid var(--border-color); text-align: center;
+        }
+        .stat-card h4 { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+        .stat-card span { font-size: 1.15rem; font-weight: 800; color: var(--text-dark); margin-top: 2px; display: block; }
+
+        .filter-container { display: flex; gap: 4px; flex-shrink: 0; }
+        .filter-btn {
+            flex: 1; padding: 7px 2px; font-size: 0.72rem; border-radius: 6px; font-weight: 600;
+            border: 1px solid var(--border-color); background: #ffffff; color: var(--text-main); cursor: pointer; transition: all 0.2s;
+        }
+        .filter-btn:hover { background: #f8fafc; }
+        .filter-btn.active { border-color: var(--accent-green); background: var(--accent-green); color: #ffffff; }
+
+        #places-list {
+            flex: 1; overflow-y: auto; list-style: none; display: flex; flex-direction: column;
+            gap: 8px; padding-right: 2px; min-height: 0;
+        }
+        #places-list::-webkit-scrollbar { width: 4px; }
+        #places-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        .place-item {
+            background: #ffffff; border-radius: 8px; border: 1px solid var(--border-color);
+            padding: 10px 12px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;
+        }
+        .place-item:hover { border-color: var(--accent-green); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
+        .place-header-banner { display: flex; align-items: center; justify-content: space-between; }
+        .place-title { font-size: 0.82rem; font-weight: 700; color: var(--text-dark); }
+        
+        .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+        .badge-crítica { background: var(--danger-bg); color: var(--danger); border: 1px solid #fca5a5; }
+        .badge-alta { background: var(--warning-bg); color: var(--warning); border: 1px solid #fcd34d; }
+        .badge-moderada { background: var(--info-bg); color: var(--info); border: 1px solid #93c5fd; }
+
+        /* MAPA Y MODAL LIMPIO */
+        #map { flex: 1; height: 100%; position: relative; }
+
+        .info-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-body); z-index: 1500; display: none; padding: 20px; overflow-y: auto;
+        }
+        .info-content { max-width: 1100px; margin: 0 auto; }
+        .info-header { 
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; 
+            border-bottom: 2px solid var(--border-color); padding-bottom: 12px; 
+        }
+        .info-header h2 { font-size: 1.25rem; font-weight: 800; color: var(--text-dark); }
+        .info-close { 
+            font-size: 1.5rem; color: var(--text-muted); cursor: pointer; padding: 2px 10px; 
+            border-radius: 6px; border: 1px solid var(--border-color); background: #fff; line-height: 1;
+        }
+        .info-close:hover { background: #fee2e2; color: var(--danger); border-color: #fca5a5; }
+
+        /* GRILLA Y TARJETAS LIMPIAS */
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 12px; }
+        .data-card { 
+            background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .data-card h3 { font-size: 0.9rem; font-weight: 700; color: var(--accent-green); margin-bottom: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+        .data-card p { font-size: 0.82rem; color: var(--text-main); line-height: 1.5; }
+        
+        .news-layout { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+        .news-article { 
+            background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .news-meta { font-size: 0.7rem; color: var(--accent-blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; display: block; }
+        .news-headline { font-size: 1rem; font-weight: 800; color: var(--text-dark); margin-bottom: 6px; }
+        .news-body { font-size: 0.85rem; color: var(--text-main); line-height: 1.5; }
+        .news-sub { margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); background: #f8fafc; padding: 8px 10px; border-radius: 6px; border-left: 3px solid var(--accent-green); }
+
+        /* FORMULARIO FLOTANTE Y BOTONES MÓVILES */
+        .floating-panel {
+            position: absolute; top: 15px; right: 15px; z-index: 1100;
+            background: #ffffff; border: 1px solid var(--border-color);
+            padding: 16px; border-radius: 10px; width: calc(100% - 30px); max-width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 0.73rem; color: var(--text-dark); font-weight: 700; margin-bottom: 3px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 8px; background: #ffffff; border: 1px solid var(--border-color);
+            border-radius: 6px; color: var(--text-dark); font-size: 0.82rem; outline: none;
+        }
+        .btn-group { display: flex; gap: 6px; }
+        .btn { flex: 1; padding: 9px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: #e2e8f0; color: var(--text-dark); }
+        .btn-gps { background: var(--info); color: white; margin-bottom: 10px; width: 100%; }
+
+        /* BOTÓN FLOTANTE PARA MOSTRAR/OCULTAR PANEL EN CELULAR */
+        #btn-toggle-sidebar {
+            display: none; position: absolute; bottom: 20px; left: 20px; z-index: 1200;
+            background: var(--bg-navbar); color: white; border: none; padding: 10px 16px;
+            border-radius: 30px; font-weight: 700; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* MEDIA QUERIES PARA ADAPTABILIDAD TOTAL EN MÓVILES */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        @media (max-width: 768px) {
+            #navbar-top { padding: 0 10px; }
+            .nav-menu { display: none; } /* Oculta menú superior amplio en móviles para evitar desbordes */
+            #user-display { display: none; }
+            
+            /* Hacemos que el panel lateral actúe como un cajón desplegable flotante */
+            #sidebar {
+                position: absolute; left: 0; top: 0; width: 85%; max-width: 320px; z-index: 1300;
+                transform: translateX(-100%); background: #ffffff; box-shadow: 5px 0 25px rgba(0,0,0,0.2);
+            }
+            #sidebar.mobile-open { transform: translateX(0); }
+            #btn-toggle-sidebar { display: flex; align-items: center; gap: 6px; }
+            
+            .info-modal { padding: 15px 10px; }
+            .info-header h2 { font-size: 1.05rem; }
+        }
+
+        .leaflet-popup-content-wrapper { background: #ffffff !important; color: var(--text-dark) !important; border-radius: 8px; border: 1px solid var(--border-color); }
+        .leaflet-popup-tip { background: #ffffff !important; }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL LOGIN -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <div class="brand-title">ECO-MAPA</div>
+            <p>Plataforma de Monitoreo e Investigación Ambiental</p>
+
+            <div class="social-login">
+                <button class="btn-social" onclick="redirigirApp('Google')">Continuar con Google</button>
+                <button class="btn-social" onclick="redirigirApp('Microsoft')">Continuar con Microsoft</button>
+            </div>
+
+            <div class="divider"><span>Acceso Institucional</span></div>
+
+            <form id="form-login">
+                <div class="form-group">
+                    <input type="email" id="login-email" required placeholder="Correo electrónico institucional">
+                </div>
+                <div class="form-group">
+                    <input type="password" required placeholder="Contraseña">
+                </div>
+                <button type="submit" class="btn btn-danger" style="width: 100%; margin-top: 5px; background: var(--accent-green);">Ingresar al Sistema</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- BARRA NAVEGACIÓN -->
+    <nav id="navbar-top">
+        <div class="nav-brand" onclick="mostrarSeccion('mapa')">ECO-MAPA <span>.ORG</span></div>
+        
+        <div class="nav-menu">
+            <div class="nav-item-wrapper active" id="nav-datos">
+                <button class="nav-button" onclick="mostrarSeccion('datos')">Datos</button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'cerca')">Contaminación cerca de mí</button>
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'clasificacion')">Clasificación en Vivo</button>
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'mapalive')">Mapa de Residuos en Vivo</button>
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'historico')">Datos históricos</button>
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'api')">API de Monitoreo</button>
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'app')">App Móvil ECO-MAPA</button>
+                    <button class="dropdown-item" onclick="cargarContenido('datos', 'colaboradores')">Colaboradores</button>
+                </div>
+            </div>
+
+            <div class="nav-item-wrapper" id="nav-aprender">
+                <button class="nav-button" onclick="mostrarSeccion('aprender')">Aprender</button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" onclick="cargarContenido('aprender', 'medir')">Medir contaminación</button>
+                    <button class="dropdown-item" onclick="cargarContenido('aprender', 'mejorar')">Tratamiento de residuos</button>
+                    <button class="dropdown-item" onclick="cargarContenido('aprender', 'comunitario')">Monitoreo de Agua</button>
+                </div>
+            </div>
+
+            <div class="nav-item-wrapper" id="nav-noticias">
+                <button class="nav-button" onclick="mostrarSeccion('noticias')">Noticias</button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'residuos')">Contaminación por Basura</button>
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'cuenca')">Gestión del Río Chira</button>
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'comunidad')">Comunidad y Vecinos</button>
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'destacado')">Colaborador Destacado</button>
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'salud')">Salud Pública</button>
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'recursos')">Recursos Municipales</button>
+                    <button class="dropdown-item" onclick="cargarContenido('noticias', 'quemas')">Quema de Basura</button>
+                </div>
+            </div>
+
+            <div class="nav-item-wrapper" id="nav-impacto">
+                <button class="nav-button" onclick="mostrarSeccion('impacto')">Impacto</button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" onclick="cargarContenido('impacto', 'climatica')">Justicia Climática</button>
+                    <button class="dropdown-item" onclick="cargarContenido('impacto', 'ambiental')">Justicia Ambiental</button>
+                    <button class="dropdown-item" onclick="cargarContenido('impacto', 'colegios')">Colegios / Schools4Earth</button>
+                    <button class="dropdown-item" onclick="cargarContenido('impacto', 'esg')">Iniciativas ESG</button>
+                    <button class="dropdown-item" onclick="cargarContenido('impacto', 'fundacion')">Fundación Limpieza</button>
+                    <button class="dropdown-item" onclick="cargarContenido('impacto', 'alianzas')">Asociaciones</button>
+                </div>
+            </div>
+        </div>
+
+        <span id="user-display" style="font-size: 0.78rem; color: #94a3b8; font-weight: 600;">Investigador</span>
+    </nav>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div id="main-layout">
+        
+        <!-- BOTÓN MÓVIL PARA ABRIR PANEL LATERAL -->
+        <button id="btn-toggle-sidebar" onclick="toggleSidebarMobile()">📂 Menú y Focos</button>
+
+        <!-- PANEL LATERAL -->
+        <div id="sidebar">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>Focos</h4>
+                    <span id="stat-total">0</span>
+                </div>
+                <div class="stat-card">
+                    <h4>Críticos</h4>
+                    <span id="stat-criticos" style="color: var(--danger);">0</span>
+                </div>
+                <div class="stat-card">
+                    <h4>km²</h4>
+                    <span id="stat-area" style="color: var(--warning);">0</span>
+                </div>
+            </div>
+
+            <div class="filter-container">
+                <button class="filter-btn active" onclick="filtrarPuntos('Todos')">Todos</button>
+                <button class="filter-btn" onclick="filtrarPuntos('Crítica')">Críticos</button>
+                <button class="filter-btn" onclick="filtrarPuntos('Alta')">Altos</button>
+                <button class="filter-btn" onclick="filtrarPuntos('Moderada')">Moderados</button>
+            </div>
+
+            <ul id="places-list"></ul>
+        </div>
+
+        <!-- MAPA -->
+        <div id="map">
+            <button id="btn-nuevo" class="btn btn-danger" style="position: absolute; top: 15px; right: 15px; z-index: 1000; width: auto; padding: 8px 14px; background: var(--accent-green); box-shadow: 0 4px 10px rgba(0,0,0,0.15); font-size: 0.8rem;">
+                + Reportar
+            </button>
+
+            <!-- Formulario Flotante -->
+            <div id="form-container" class="floating-panel" style="display: none;">
+                <h3 style="margin-bottom: 10px; font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">Registrar Incidencia</h3>
+                <button class="btn btn-gps" id="btn-obtener-gps">Obtener Coordenadas GPS</button>
+                
+                <form id="form-punto">
+                    <div class="form-group">
+                        <label>Coordenadas</label>
+                        <input type="text" id="f-coords" readonly required placeholder="Clic en el mapa">
+                    </div>
+                    <div class="form-group">
+                        <label>Sector / Referencia</label>
+                        <input type="text" id="f-nombre" required placeholder="Ej. Canal Vía">
+                    </div>
+                    <div class="form-group">
+                        <label>Nivel de Alerta</label>
+                        <select id="f-gravedad">
+                            <option value="Crítica">Crítica</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Moderada">Moderada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Radio (m)</label>
+                        <input type="number" id="f-radio" value="200" min="50" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="f-impacto" rows="2" required placeholder="Detalle del problema..."></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-danger" style="background: var(--accent-green);">Guardar</button>
+                        <button type="button" class="btn btn-secondary" id="btn-cancelar">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- VENTANA MODAL COMPLETA -->
+        <div id="modal-dinamico" class="info-modal">
+            <div class="info-content">
+                <div class="info-header">
+                    <h2 id="modal-titulo">Cargando...</h2>
+                    <span class="info-close" onclick="cerrarModales()">&times;</span>
+                </div>
+                <div id="modal-cuerpo"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        function toggleSidebarMobile() {
+            document.getElementById('sidebar').classList.toggle('mobile-open');
+        }
+
+        function redirigirApp(plataforma) {
+            localStorage.setItem('usuario_activo', plataforma);
+            document.getElementById('user-display').innerText = plataforma;
+            document.getElementById('login-overlay').style.display = 'none';
+        }
+
+        document.getElementById('form-login').onsubmit = (e) => {
+            e.preventDefault();
+            const user = document.getElementById('login-email').value.split('@')[0];
+            document.getElementById('user-display').innerText = user;
+            document.getElementById('login-overlay').style.display = 'none';
+        };
+
+        function generar10Items(tituloBase, tipo, itemsDetalle) {
+            if (tipo === 'grid') {
+                let html = '<div class="data-grid">';
+                itemsDetalle.forEach((item, index) => {
+                    html += `
+                        <div class="data-card">
+                            <h3>${index + 1}. ${item.sub}</h3>
+                            <p><strong>Ubicación:</strong> ${item.zona}</p>
+                            <p style="margin-top:4px;">${item.desc}</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                return html;
+            } else {
+                let html = '<div class="news-layout">';
+                itemsDetalle.forEach((item, index) => {
+                    html += `
+                        <article class="news-article">
+                            <span class="news-meta">Reporte #${index + 1} — ${item.zona}</span>
+                            <h3 class="news-headline">${item.sub}</h3>
+                            <p class="news-body">${item.desc}</p>
+                            <div class="news-sub"><strong>Indicador:</strong> ${item.extra}</div>
+                        </article>
+                    `;
+                });
+                html += '</div>';
+                return html;
+            }
+        }
+
+        const baseDatosContaminacion = {
+            datos: {
+                cerca: {
+                    titulo: "Puntos de Contaminación Cercanos en Sullana",
+                    html: generar10Items("Cerca", "news", [
+                        { zona: "Canal Vía - Barrio Leticia", sub: "Afloramiento de Desagües", desc: "Acumulación masiva de plásticos y residuos biológicos cerca de viviendas.", extra: "Alto riesgo de dengue." },
+                        { zona: "Río Chira - Puente Isaura", sub: "Descarga de Efluentes", desc: "Vertimiento ininterrumpido de aguas residuales en la faja marginal.", extra: "Exceso de coliformes." },
+                        { zona: "AA.HH. El Obrero", sub: "Botadero Informal", desc: "Desechos domésticos no recogidos por los compactadores.", extra: "Bloqueo parcial de vía." },
+                        { zona: "Mercado Modelo", sub: "Residuos Orgánicos", desc: "Desechos de mercado sin segregación generando lixiviados.", extra: "Foco infeccioso." },
+                        { zona: "Av. Buenos Aires", sub: "Desmonte", desc: "Residuos de obras civiles abandonados en berma central.", extra: "Polvo suspendido." },
+                        { zona: "AA.HH. Santa Teresita", sub: "Plásticos en Drenes", desc: "Obstrucción de canales pluviales con envases descartables.", extra: "Riesgo de inundación." },
+                        { zona: "Salida a Tambogrande", sub: "Botadero a Cielo Abierto", desc: "Arrojo nocturno de basura por vehículos de carga.", extra: "Malos olores." },
+                        { zona: "Transversal Dos de Mayo", sub: "Aguas Negras", desc: "Ruptura de tubería de alcantarillado frente a comercios.", extra: "Gases de azufre." },
+                        { zona: "Cola del Alacrán", sub: "Basura Industrial", desc: "Desechos de talleres vertidos sobre suelo desnudo.", extra: "Filtración de hidrocarburos." },
+                        { zona: "AA.HH. Nueve de Octubre", sub: "Foco de Vectores", desc: "Acumulación de agua residual en depresiones del terreno.", extra: "Población expuesta." }
+                    ])
+                },
+                clasificacion: {
+                    titulo: "Clasificación de Sectores",
+                    html: generar10Items("Clasificacion", "grid", [
+                        { sub: "Canal Vía", zona: "Sector 1", desc: "Alerta: CRÍTICA. Colector principal colapsado." },
+                        { sub: "Cuenca Baja Río Chira", zona: "Sector 2", desc: "Alerta: CRÍTICA. Vertimiento directo." },
+                        { sub: "Mercado Modelo", zona: "Sector 3", desc: "Alerta: CRÍTICA. Basura orgánica comercial." },
+                        { sub: "AA.HH. El Obrero", zona: "Sector 4", desc: "Alerta: ALTA. Falla en recojo municipal." },
+                        { sub: "AA.HH. Santa Teresita", zona: "Sector 5", desc: "Alerta: ALTA. Botaderos clandestinos." },
+                        { sub: "Eje Vial", zona: "Sector 6", desc: "Alerta: ALTA. Residuos plásticos." },
+                        { sub: "San Martín", zona: "Sector 7", desc: "Alerta: MODERADA. Vegetación seca." },
+                        { sub: "9 de Octubre", zona: "Sector 8", desc: "Alerta: ALTA. Charcos de agua servida." },
+                        { sub: "Puente Isaura", zona: "Sector 9", desc: "Alerta: CRÍTICA. Plásticos y restos orgánicos." },
+                        { sub: "Salida a Paita", zona: "Sector 10", desc: "Alerta: MODERADA. Residuos industriales." }
+                    ])
+                },
+                mapalive: { titulo: "Mapa de Residuos en Vivo", html: generar10Items("MapaLive", "news", [{ zona: "Canal Vía", sub: "Obstrucción lateral", desc: "Bolsas obstruyen tubería.", extra: "En verificación." }, { zona: "Mercado", sub: "Lixiviados", desc: "Desechos en pista.", extra: "Pendiente." }, { zona: "El Obrero", sub: "Quema", desc: "Humo negro.", extra: "Alerta Serenazgo." }, { zona: "Río Chira", sub: "Escombros", desc: "Desmonte arrojado.", extra: "Registrado." }, { zona: "Av. Buenos Aires", sub: "Restos orgánicos", desc: "Riesgo biológico.", extra: "Alta prioridad." }, { zona: "Santa Teresita", sub: "Contenedor saturado", desc: "Supera capacidad.", extra: "Requiere compactador." }, { zona: "Calle 2", sub: "Fuga", desc: "Buzón emitiendo agua.", extra: "Derivado a EPS Grau." }, { zona: "Tambogrande", sub: "Fuego activo", desc: "Botadero informal.", extra: "En atención." }, { zona: "Alacrán", sub: "Aceite", desc: "Lubricantes en calzada.", extra: "Inspección." }, { zona: "San Martín", sub: "Poda", desc: "Ramas acumuladas.", extra: "Programado." }]) },
+                historico: { titulo: "Datos Históricos (2020-2026)", html: generar10Items("Historico", "grid", [{ sub: "Canal Vía 2023", zona: "Sullana", desc: "1,200 toneladas de plásticos." }, { sub: "Incremento 2024", zona: "Provincia", desc: "Aumento del 18%." }, { sub: "Agua Chira 2022", zona: "Cuenca", desc: "E. Coli superó estándares." }, { sub: "Quemas 2025", zona: "Periferia", desc: "Más de 500 eventos." }, { sub: "Colapsos 2023", zona: "Leticia", desc: "14 rupturas registradas." }, { sub: "El Niño", zona: "Provincia", desc: "5,000 m³ de basura arrastrada." }, { sub: "Limpieza 2024", zona: "Mercado", desc: "80 toneladas retiradas." }, { sub: "Lixiviados 2025", zona: "Botaderos", desc: "Filtración en suelos." }, { sub: "Cobertura 2022", zona: "Periferia", desc: "Solo 65% cubierto." }, { sub: "Reciclaje", zona: "Urbano", desc: "300 recicladores informales." }]) },
+                api: { titulo: "API de Monitoreo", html: generar10Items("API", "grid", [{ sub: "GET /focos", zona: "JSON", desc: "Listado de puntos críticos." }, { sub: "GET /rio/calidad", zona: "JSON", desc: "Métricas de agua." }, { sub: "POST /reportes", zona: "JSON", desc: "Registro de incidencias." }, { sub: "GET /quemas", zona: "JSON", desc: "Alertas de humo." }, { sub: "GET /cobertura", zona: "JSON", desc: "Estadísticas de limpieza." }, { sub: "GET /dengue", zona: "JSON", desc: "Mapa de calor." }, { sub: "GET /estadisticas", zona: "JSON", desc: "Resumen mensual." }, { sub: "PUT /reportes", zona: "JSON", desc: "Actualizar estado." }, { sub: "GET /sensores", zona: "JSON", desc: "Toxicidad." }, { sub: "GET /usuarios", zona: "JSON", desc: "Puntuación." }]) },
+                app: { titulo: "App Móvil ECO-MAPA", html: generar10Items("App", "news", [{ zona: "GPS", sub: "Geolocalización", desc: "Toma foto y envía ubicación.", extra: "Android / iOS." }, { zona: "Alertas", sub: "Avisos de humo", desc: "Notificaciones push.", extra: "Tiempo real." }, { zona: "Ciudadano", sub: "Seguimiento", desc: "Estado de denuncias.", extra: "Transparente." }, { zona: "Educativo", sub: "Guía de segregación", desc: "Aprende en casa.", extra: "Interactivo." }, { zona: "Horarios", sub: "Ruta del recolector", desc: "Ubicación del camión.", extra: "En vivo." }, { zona: "Recompensas", sub: "Ecopuntos", desc: "Canjea por plantones.", extra: "Incentivo." }, { zona: "Offline", sub: "Modo sin internet", desc: "Guarda y sincroniza.", extra: "Útil." }, { zona: "Social", sub: "Foro barrial", desc: "Organiza faenas.", extra: "Comunidad." }, { zona: "Directorio", sub: "Contacto municipal", desc: "Llamada directa.", extra: "Gestión." }, { zona: "Salud", sub: "Prevención dengue", desc: "Consejos médicos.", extra: "Salud." }]) },
+                colaboradores: { titulo: "Reconocimiento a Colaboradores", html: generar10Items("Colaboradores", "grid", [{ sub: "Junta Leticia", zona: "Canal Vía", desc: "Erradicación de botaderos." }, { sub: "Brigada Santa Teresita", zona: "Este", desc: "Mapeo semanal." }, { sub: "Colectivo Chira", zona: "Marcavelica", desc: "Limpieza de orillas." }, { sub: "Recicladores Sullana", zona: "Provincia", desc: "Formalización." }, { sub: "I.E. Salaverry", zona: "Centro", desc: "Monitoreo escolar." }, { sub: "Voluntarios UDEP", zona: "Industrial", desc: "Muestras de agua." }, { sub: "Comité El Obrero", zona: "Norte", desc: "Supervisión de rutas." }, { sub: "Scouts Sullana", zona: "Río", desc: "Reforestación." }, { sub: "Comerciantes", zona: "Mercado", desc: "Contenedores propios." }, { sub: "Red Salud", zona: "Provincia", desc: "Prevención." }]) }
+            },
+            aprender: {
+                medir: { titulo: "Técnicas para Medir Contaminación", html: generar10Items("Medir", "grid", [{ sub: "IDR", zona: "Métrica", desc: "Kg de basura por m²." }, { sub: "E. Coli", zona: "Laboratorio", desc: "Filtración en agua." }, { sub: "Lixiviados", zona: "Química", desc: "Evaluación de PH." }, { sub: "Satélite", zona: "Teledetección", desc: "Imágenes Sentinel." }, { sub: "Entomología", zona: "Campo", desc: "Conteo de larvas." }, { sub: "Secchi", zona: "Agua", desc: "Turbidez del río." }, { sub: "Opacidad", zona: "Aire", desc: "Hollín y humo." }, { sub: "Caracterización", zona: "Basura", desc: "Composición porcentual." }, { sub: "Olfatometría", zona: "Olores", desc: "Gases en Canal Vía." }, { sub: "Logística", zona: "Eficiencia", desc: "Tiempos de recojo." }]) },
+                mejorar: { titulo: "Mejora en Tratamiento de Residuos", html: generar10Items("Mejorar", "news", [{ zona: "Planta", sub: "Compostaje de mercado", desc: "30 toneladas diarias de abono.", extra: "Reduce 40%." }, { zona: "Recicladores", sub: "Centros de acopio", desc: "Triaje seguro.", extra: "Empleo digno." }, { zona: "Canal Vía", sub: "Techado y filtros", desc: "Elimina malos olores.", extra: "Infraestructura." }, { zona: "Relleno", sub: "Celda con geomembrana", desc: "Aislamiento técnico.", extra: "Moderno." }, { zona: "Multas", sub: "Fiscalización nocturna", desc: "Cero tolerancia a quemas.", extra: "Sanciones." }, { zona: "Contenedores", sub: "Puntos limpios", desc: "Depósitos cerrados.", extra: "Herméticos." }, { zona: "Vetiver", sub: "Bio-remediación", desc: "Plantas purificadoras.", extra: "Natural." }, { zona: "GPS", sub: "Rastreo de compactadores", desc: "Optimización de rutas.", extra: "95% eficiencia." }, { zona: "Trueque", sub: "Basura por alimentos", desc: "Incentivo vecinal.", extra: "Educativo." }, { zona: "Evaporación", sub: "Piscinas de lixiviados", desc: "Captura de jugos.", extra: "Seguro." }]) },
+                comunitario: { titulo: "Monitoreo Comunitario", html: generar10Items("Comunitario", "grid", [{ sub: "Red Chira", zona: "Marcavelica", desc: "Kits de medición." }, { sub: "Vigilancia Leticia", zona: "Canal Vía", desc: "Denuncia de arrojadores." }, { sub: "Alertas Servidas", zona: "El Obrero", desc: "Reporte de colectores." }, { sub: "Red Escolar", zona: "Colegios", desc: "Análisis de agua." }, { sub: "Turicarami", zona: "Ribera", desc: "Supervisión de vegetación." }, { sub: "Faja Marginal", zona: "Puente", desc: "Evitar desmonte." }, { sub: "Alarma Quemas", zona: "Tambogrande", desc: "Apagar incendios." }, { sub: "Mapeadores", zona: "Santa Teresita", desc: "App ECO-MAPA." }, { sub: "Acequias", zona: "Valle", desc: "Limpieza de canales." }, { sub: "Asamblea", zona: "Centro", desc: "Exigencia local." }]) }
+            },
+            noticias: {
+                residuos: { titulo: "Crisis de Residuos Sólidos", html: generar10Items("Residuos", "news", [{ zona: "Santa Teresita", sub: "Bloqueo por basura", desc: "5 días sin recojo municipal.", extra: "Exigen alcalde." }, { zona: "Canal Vía", sub: "Colapso sanitario", desc: "Cierre de locales por olor.", extra: "Pérdidas." }, { zona: "Mercado", sub: "Frecuencia nocturna", desc: "Piden recojo a las 10 PM.", extra: "Propuesta." }, { zona: "El Obrero", sub: "Plaga de moscas", desc: "Aumento de infecciones.", extra: "Alerta médica." }, { zona: "Av. Buenos Aires", sub: "Compactador atascado", desc: "Escombros impiden paso.", extra: "Retraso." }, { zona: "Río Chira", sub: "Arrojo desde mototaxis", desc: "Videos delatan infractores.", extra: "Investigación." }, { zona: "Dos de Mayo", sub: "Inundación servida", desc: "Salas afectadas.", extra: "Daños." }, { zona: "San Mateo", sub: "Limpieza pesada", desc: "40 toneladas retiradas.", extra: "Recuperado." }, { zona: "9 de Octubre", sub: "Lluvias y basura", desc: "Foco infeccioso doble.", extra: "Alerta." }, { zona: "Paita", sub: "Protesta de transportistas", desc: "Mala imagen urbana.", extra: "Reclamo." }]) },
+                cuenca: { titulo: "Cuenca del Río Chira", html: generar10Items("Cuenca", "news", [{ zona: "Puente Isaura", sub: "Muerte biológica", desc: "Falta de oxígeno en agua.", extra: "Alerta." }, { zona: "Marcavelica", sub: "Proyecto paralizado", desc: "Reclamo por presupuesto.", extra: "Promesa." }, { zona: "Valle", sub: "Riego con agua sucia", desc: "Peligro en hortalizas.", extra: "Alimentario." }, { zona: "Turicarami", sub: "Plaga de lechuguines", desc: "Bloqueo de caudal.", extra: "Vegetal." }, { zona: "La Manzanilla", sub: "Peces muertos", desc: "Descargas clandestinas.", extra: "Muestreo." }, { zona: "Faja Marginal", sub: "Invasiones", desc: "Casas sobre basurales.", extra: "Peligro." }, { zona: "Poechos", sub: "Sedimentos y plástico", desc: "Reducción de capacidad.", extra: "Presa." }, { zona: "Querecotillo", sub: "Jornada de limpieza", desc: "5 toneladas retiradas.", extra: "Voluntarios." }, { zona: "Sullana", sub: "Falta de PTAR", desc: "Necesidad urgente.", extra: "Proyecto." }, { zona: "Bocatoma", sub: "Presencia de detergentes", desc: "Espuma química.", extra: "Potabilización." }]) },
+                comunidad: { titulo: "Comunidad Organizada", html: generar10Items("Comunidad", "news", [{ zona: "Leticia", sub: "Murales ecológicos", desc: "Arte en basurales.", extra: "Recuperación." }, { zona: "El Obrero", sub: "Vigilancia verde", desc: "Denuncia a infractores.", extra: "Control." }, { zona: "Santa Teresita", sub: "Marcha pacífica", desc: "Exigen soluciones.", extra: "Movilización." }, { zona: "Centro", sub: "Feria de reciclaje", desc: "10 toneladas de cartón.", extra: "Éxito." }, { zona: "López Albújar", sub: "Jardines barriales", desc: "Algarrobos en esquinas.", extra: "Belleza." }, { zona: "9 de Octubre", sub: "Compostaje doméstico", desc: "Talleres para madres.", extra: "Origen." }, { zona: "Bellavista", sub: "Faena de limpieza", desc: "50 voluntarios activos.", extra: "Acción." }, { zona: "Villa Primavera", sub: "Letreros de multas", desc: "Creatividad popular.", extra: "Prevención." }, { zona: "Mariátegui", sub: "Radio local", desc: "Denuncias en vivo.", extra: "Voz." }, { zona: "Periferia", sub: "Red contra el dengue", desc: "Eliminación de criaderos.", extra: "Salud." }]) },
+                destacado: { titulo: "Colaboradores del Mes", html: generar10Items("Destacado", "news", [{ zona: "Leticia", sub: "María Silva", desc: "10 años limpiando el canal.", extra: "Premio." }, { zona: "El Obrero", sub: "Jorge Zapata", desc: "Trampa para plástico.", extra: "Innovación." }, { zona: "Salaverry", sub: "Profesor Mendoza", desc: "Brigadas escolares.", extra: "Docente." }, { zona: "Marcavelica", sub: "Don Luis Navarro", desc: "Guardián del río.", extra: "Ejemplo." }, { zona: "Mercado", sub: "Rosa Juarez", desc: "Comerciante Basura Cero.", extra: "Líder." }, { zona: "Centro", sub: "EcoSullana", desc: "50 reportes cargados.", extra: "Estrellas." }, { zona: "Santa Teresita", sub: "Lucía Torres", desc: "Huerto urbano.", extra: "Impacto." }, { zona: "Industrial", sub: "Ing. Roberto Ruiz", desc: "Asesoría gratuita.", extra: "Técnico." }, { zona: "Villa Primavera", sub: "BiciVerde", desc: "Reciclaje en bici.", extra: "Transporte." }, { zona: "Bellavista", sub: "Familia Gómez", desc: "Punto limpio en casa.", extra: "Familiar." }]) },
+                salud: { titulo: "Salud Pública", html: generar10Items("Salud", "news", [{ zona: "Hospital", sub: "Infecciones respiratorias", desc: "Aumento del 35% por quema.", extra: "Alerta." }, { zona: "Centros de Salud", sub: "Casos de dengue", desc: "Relacionado a botaderos.", extra: "Vectores." }, { zona: "El Obrero", sub: "Dermatitis en niños", desc: "Contacto con aguas servidas.", extra: "Emergencia." }, { zona: "Urbano", sub: "Parasitosis", desc: "Moscas del mercado.", extra: "Higiene." }, { zona: "Leticia", sub: "Impacto psicológico", desc: "Estrés por mal olor.", extra: "Mental." }, { zona: "Santa Teresita", sub: "Riesgo entérico", desc: "Pozos contaminados.", extra: "No potable." }, { zona: "Ribereña", sub: "Intoxicación por peces", desc: "Bacterias en Chira.", extra: "Prohibición." }, { zona: "Cancha Pelada", sub: "Fumigación", desc: "Control de plagas.", extra: "Minsa." }, { zona: "General", sub: "Mordeduras de roedores", desc: "Peligro de leptospirosis.", extra: "Control." }, { zona: "Escuelas", sub: "Suspensión de clases", desc: "Epidemia estomacal.", extra: "Colegios." }]) },
+                recursos: { titulo: "Recursos Municipales", html: generar10Items("Recursos", "grid", [{ sub: "Compactadores", zona: "Flota", desc: "Solo 4 de 10 operativos." }, { sub: "Presupuesto", zona: "Fiscal", desc: "12% asignado a limpieza." }, { sub: "Personal", zona: "Obreros", desc: "120 trabajadores activos." }, { sub: "Combustible", zona: "Logística", desc: "Desabastecimiento temporal." }, { sub: "Contenedores", zona: "Equipamiento", desc: "Compra de 100 unidades." }, { sub: "Barredoras", zona: "Talleres", desc: "En reparación." }, { sub: "Rutas", zona: "Operaciones", desc: "Turno de medianoche." }, { sub: "EPS Grau", zona: "Convenio", desc: "Buzones colapsados." }, { sub: "Cámaras", zona: "Seguridad", desc: "Identificar desmonte." }, { sub: "EPP", zona: "Seguridad", desc: "Guantes y trajes." }]) },
+                quemas: { titulo: "Quema Abierta de Basura", html: generar10Items("Quemas", "news", [{ zona: "Tambogrande", sub: "Incendio en botadero", desc: "8 horas de humo tóxico.", extra: "Bomberos." }, { zona: "Alacrán", sub: "Quema de cables", desc: "Extracción ilegal de cobre.", extra: "Delito." }, { zona: "El Obrero", sub: "Quema doméstica", desc: "Desesperación vecinal.", extra: "Peligroso." }, { zona: "Río Chira", sub: "Poda destruida", desc: "Fuego afecta algarrobos.", extra: "Daño." }, { zona: "Champagnat", sub: "Accidente vehicular", desc: "Cero visibilidad por humo.", extra: "Vial." }, { zona: "Santa Teresita", sub: "Colegio afectado", desc: "Estudiantes evacuados.", extra: "Escolar." }, { zona: "Paita", sub: "Detenidos in fraganti", desc: "Serenazgo captura autores.", extra: "Judicial." }, { zona: "Dos de Mayo", sub: "Contenedor quemado", desc: "Colilla de cigarrillo.", extra: "Pérdida." }, { zona: "Cancha Pelada", sub: "Picos de CO2", desc: "Altas emisiones a las 2 AM.", extra: "Aire." }, { zona: "Marcavelica", sub: "Fuego en cultivos", desc: "Expansión a basurales.", extra: "Extensión." }]) }
+            },
+            impacto: {
+                climatica: { titulo: "Justicia Climática", html: generar10Items("Climatica", "grid", [{ sub: "Vulnerabilidad", zona: "Asentamientos", desc: "Pobreza y focos infecciosos." }, { sub: "Calor", zona: "Urbano", desc: "Acelera putrefacción." }, { sub: "Desigualdad", zona: "Norte vs Centro", desc: "Más recojo en centro." }, { sub: "Grupos", zona: "Provincia", desc: "Niños y ancianos afectados." }, { sub: "Espacios", zona: "Parques", desc: "Convertidos en botaderos." }, { sub: "Desplazamiento", zona: "Canal Vía", desc: "Familias huyen del olor." }, { sub: "Inundaciones", zona: "Lluvias", desc: "Basura flotante." }, { sub: "Agua", zona: "Asentamientos", desc: "Acumulación en recipientes." }, { sub: "Resiliencia", zona: "Comunidad", desc: "Respuesta vecinal." }, { sub: "Derechos", zona: "Legal", desc: "Demanda ambiental." }]) },
+                ambiental: { titulo: "Justicia Ambiental", html: generar10Items("Ambiental", "news", [{ zona: "Defensoría", sub: "Exhortación municipal", desc: "Exigen medidas urgentes.", extra: "Oficial." }, { zona: "Fiscalía", sub: "Investigación al río", desc: "Responsables sin tratamiento.", extra: "Penal." }, { zona: "Juzgado", sub: "Acción de amparo", desc: "Admitida por vecinos.", extra: "Fallo." }, { zona: "OEFA", sub: "Supervisión de botaderos", desc: "Riesgo en napa freática.", extra: "Informe." }, { zona: "Abogados", sub: "Asesoría gratuita", desc: "Apoyo en querellas.", extra: "Jurídico." }, { zona: "Diálogo", sub: "Mesa de trabajo", desc: "Fiscalización quincenal.", extra: "Compromiso." }, { zona: "Salud", sub: "Emergencia sanitaria", desc: "Fondos de contingencia.", extra: "Minsa." }, { zona: "Víctimas", sub: "Demanda por humo", desc: "Indemnización por salud.", extra: "Colectiva." }, { zona: "Auditoría", sub: "Gasto público", desc: "Transparencia en limpieza.", extra: "Social." }, { zona: "Universidad", sub: "Estudio publicado", desc: "Injusticia en Sullana.", extra: "Académico." }]) },
+                colegios: { titulo: "Schools4Earth", html: generar10Items("Colegios", "grid", [{ sub: "Salaverry", zona: "Centro", desc: "Ecopuntos de botellas." }, { sub: "Santa Teresa", zona: "Bellavista", desc: "Papel reciclado." }, { sub: "Capullanas", zona: "Urbano", desc: "Reforestación." }, { sub: "INA 54", zona: "Agrícola", desc: "Bio-huertos escolares." }, { sub: "San Pedro", zona: "El Obrero", desc: "Mapeo con app." }, { sub: "Merino", zona: "Central", desc: "Marchas estudiantiles." }, { sub: "Auxiliadora", zona: "Norte", desc: "Cero plásticos." }, { sub: "Fe y Alegría", zona: "Santa Teresita", desc: "Concientización." }, { sub: "UDEP", zona: "Provincia", desc: "Sensores de aire." }, { sub: "Inicial", zona: "Red", desc: "Juegos de reciclaje." }]) },
+                esg: { titulo: "Iniciativas ESG", html: generar10Items("ESG", "news", [{ zona: "Caja Sullana", sub: "Donación de contenedores", desc: "30 depósitos metálicos.", extra: "Inversión." }, { zona: "Agroindustria", sub: "Abono orgánico", desc: "Compost de banano.", extra: "Circular." }, { zona: "Comercio", sub: "Campaña de bolsas", desc: "Descuentos por tela.", extra: "Plástico." }, { zona: "Transportes", sub: "Compromiso vial", desc: "No arrojar desechos.", extra: "Prácticas." }, { zona: "Industrias", sub: "Plantas de efluentes", desc: "Limpieza previa.", extra: "Cuenca." }, { zona: "Molinos", sub: "Energía con cáscara", desc: "Calderas ecológicas.", extra: "Limpia." }, { zona: "Bancos", sub: "Voluntariado corporativo", desc: "Limpieza dominical.", extra: "Social." }, { zona: "Comerciales", sub: "Máquinas recicladoras", desc: "Cupones por botellas.", extra: "Verde." }, { zona: "Embotelladoras", sub: "Retornabilidad", desc: "Acopio en bodegas.", extra: "Vidrio." }, { zona: "Talleres", sub: "Gestión de aceites", desc: "Lubricantes certificados.", extra: "Peligroso." }]) },
+                fundacion: { titulo: "Fundación Limpieza", html: generar10Items("Fundacion", "grid", [{ sub: "Canal Vía Verde", zona: "Urbano", desc: "Parque lineal proyectado." }, { sub: "Fondo Comunitario", zona: "Provincia", desc: "Herramientas para juntas." }, { sub: "Investigación", zona: "Río Chira", desc: "Monitoreo biológico." }, { sub: "Liderazgo", zona: "Norte", desc: "Fiscalizadores jóvenes." }, { sub: "Puntos Verdes", zona: "Asentamientos", desc: "20 estaciones." }, { sub: "Adopta un Parque", zona: "Urbanizaciones", desc: "Cuidado de espacios." }, { sub: "Esterilización", zona: "Periferia", desc: "Control animal." }, { sub: "Informe Anual", zona: "Global", desc: "Mapa sanitario." }, { sub: "Arte", zona: "Cultura", desc: "Esculturas con llantas." }, { sub: "Alianzas", zona: "Academia", desc: "Estudios de lixiviados." }]) },
+                alianzas: { titulo: "Asociaciones Público-Privadas", html: generar10Items("Alianzas", "news", [{ zona: "Muni - Privados", sub: "Nueva planta de residuos", desc: "Tecnología de punta.", extra: "Estratégica." }, { zona: "MINAM - Región", sub: "10 compactadores nuevos", desc: "Renovación de flota.", extra: "Aprobado." }, { zona: "EPS Grau", sub: "Colector Canal Vía", desc: "Inversión millonaria.", extra: "En ejecución." }, { zona: "Recicladores", sub: "Ruta selectiva oficial", desc: "Inclusión laboral.", extra: "Convenio." }, { zona: "ONG", sub: "Bio-filtros de agua", desc: "Purificación casera.", extra: "Salud." }, { zona: "Cámara - U", sub: "Foro ambiental", desc: "Encuentro trimestral.", extra: "Técnico." }, { zona: "Minsa", sub: "Control de dengue", desc: "Fumigación coordinada.", extra: "Prevención." }, { zona: "Bananeras", sub: "Uso de tallos", desc: "Retención de humedad.", extra: "Sostenible." }, { zona: "PNUD", sub: "Plan de acción climática", desc: "Asistencia global.", extra: "Global." }, { zona: "Consorcio", sub: "Panamericana limpia", desc: "Mantenimiento vial.", extra: "Urbana." }]) }
+            }
+        };
+
+        function mostrarSeccion(categoria) {
+            document.querySelectorAll('.nav-item-wrapper').forEach(el => el.classList.remove('active'));
+            const elem = document.getElementById(`nav-${categoria}`);
+            if(elem) elem.classList.add('active');
+            
+            if(categoria === 'mapa') {
+                cerrarModales();
+                return;
+            }
+            
+            const primerSub = Object.keys(baseDatosContaminacion[categoria] || {})[0];
+            if(primerSub) cargarContenido(categoria, primerSub);
+        }
+
+        function cargarContenido(cat, sub) {
+            const data = baseDatosContaminacion[cat]?.[sub];
+            if(data) {
+                document.getElementById('modal-titulo').innerText = data.titulo;
+                document.getElementById('modal-cuerpo').innerHTML = data.html;
+            }
+            document.getElementById('modal-dinamico').style.display = 'block';
+            document.getElementById('sidebar').classList.remove('mobile-open');
+        }
+
+        function cerrarModales() {
+            document.getElementById('modal-dinamico').style.display = 'none';
+        }
+
+        const map = L.map('map', { zoomControl: false }).setView([-4.9011, -80.6853], 14);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        const referenciasSullana = [
+            "Canal Vía - Leticia", "Río Chira - Turicarami", "Mercado Modelo",
+            "Av. Buenos Aires", "Santa Teresita", "El Obrero",
+            "Dos de Mayo", "Av. Champagnat", "San Martín",
+            "Cola del Alacrán", "9 de Octubre", "Salida Tambogrande"
+        ];
+
+        const problemasDesc = [
+            "Afloramiento de aguas servidas.",
+            "Acumulación descontrolada de basura.",
+            "Quema clandestina de plásticos.",
+            "Estancamiento de agua y vectores."
+        ];
+
+        function generar50Puntos() {
+            const puntos = [];
+            const niveles = ["Crítica", "Alta", "Moderada"];
+            for (let i = 1; i <= 50; i++) {
+                const lat = -4.9011 + (Math.random() - 0.5) * 0.04;
+                const lng = -80.6853 + (Math.random() - 0.5) * 0.04;
+                puntos.push({
+                    id: i,
+                    nombre: `${referenciasSullana[i % referenciasSullana.length]} #${i}`,
+                    coordenadas: [lat, lng],
+                    radio: Math.floor(Math.random() * 200) + 100,
+                    gravedad: niveles[i % 3],
+                    impacto: problemasDesc[i % problemasDesc.length]
+                });
+            }
+            return puntos;
+        }
+
+        let zonas = JSON.parse(localStorage.getItem('zonas_ecomapa_sullana')) || generar50Puntos();
+        let capasMapa = {};
+        let coordsSeleccionadas = null;
+
+        function getColor(gravedad) {
+            return gravedad === "Crítica" ? "#dc2626" : gravedad === "Alta" ? "#d97706" : "#2563eb";
+        }
+
+        function renderizarUI(filtro = 'Todos') {
+            const lista = document.getElementById('places-list');
+            lista.innerHTML = '';
+            Object.values(capasMapa).forEach(c => map.removeLayer(c));
+            capasMapa = {};
+
+            let countCriticos = 0;
+            let areaTotal = 0;
+
+            zonas.forEach(z => {
+                if (z.gravedad === "Crítica") countCriticos++;
+                areaTotal += Math.PI * Math.pow(z.radio, 2);
+
+                if (filtro !== 'Todos' && z.gravedad !== filtro) return;
+
+                const color = getColor(z.gravedad);
+                const circulo = L.circle(z.coordenadas, {
+                    color: color, fillColor: color, fillOpacity: 0.25, radius: z.radio, weight: 2
+                }).addTo(map);
+
+                circulo.bindPopup(`
+                    <div style="padding: 2px; min-width: 200px;">
+                        <h4 style="color:${color}; font-size: 0.9rem; font-weight: 800; margin-bottom: 6px;">${z.nombre}</h4>
+                        <p style="font-size: 0.78rem; margin-bottom: 4px;"><strong>Impacto:</strong> ${z.impacto}</p>
+                    </div>
+                `);
+
+                capasMapa[z.id] = circulo;
+
+                const li = document.createElement('li');
+                li.className = 'place-item';
+                li.innerHTML = `
+                    <div class="place-header-banner">
+                        <span class="place-title">${z.nombre}</span>
+                        <span class="badge badge-${z.gravedad.toLowerCase()}">${z.gravedad}</span>
+                    </div>
+                    <p style="font-size:0.75rem; color: var(--text-muted);">${z.impacto}</p>
+                `;
+                li.onclick = () => {
+                    cerrarModales();
+                    map.flyTo(z.coordenadas, 16);
+                    circulo.openPopup();
+                    document.getElementById('sidebar').classList.remove('mobile-open');
+                };
+                lista.appendChild(li);
+            });
+
+            document.getElementById('stat-total').innerText = zonas.length;
+            document.getElementById('stat-criticos').innerText = countCriticos;
+            document.getElementById('stat-area').innerText = (areaTotal / 1000000).toFixed(2);
+            localStorage.setItem('zonas_ecomapa_sullana', JSON.stringify(zonas));
+        }
+
+        function filtrarPuntos(tipo) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderizarUI(tipo);
+        }
+
+        const formContainer = document.getElementById('form-container');
+        document.getElementById('btn-nuevo').onclick = () => {
+            formContainer.style.display = 'block';
+            setTimeout(() => map.invalidateSize(), 200);
+        };
+        document.getElementById('btn-cancelar').onclick = () => formContainer.style.display = 'none';
+
+        map.on('click', (e) => {
+            if (formContainer.style.display === 'block') {
+                coordsSeleccionadas = [e.latlng.lat, e.latlng.lng];
+                document.getElementById('f-coords').value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+            }
+        });
+
+        document.getElementById('btn-obtener-gps').onclick = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    coordsSeleccionadas = [pos.coords.latitude, pos.coords.longitude];
+                    document.getElementById('f-coords').value = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+                    map.flyTo(coordsSeleccionadas, 16);
+                });
+            }
+        };
+
+        document.getElementById('form-punto').onsubmit = (e) => {
+            e.preventDefault();
+            if (!coordsSeleccionadas) return alert("Selecciona un lugar en el mapa.");
+
+            const nuevaZona = {
+                id: Date.now(),
+                nombre: document.getElementById('f-nombre').value,
+                coordenadas: coordsSeleccionadas,
+                gravedad: document.getElementById('f-gravedad').value,
+                radio: parseInt(document.getElementById('f-radio').value),
+                impacto: document.getElementById('f-impacto').value
+            };
+
+            zonas.unshift(nuevaZona);
+            renderizarUI();
+            formContainer.style.display = 'none';
+            document.getElementById('form-punto').reset();
+            coordsSeleccionadas = null;
+        };
+
+        const usuarioGuardado = localStorage.getItem('usuario_activo');
+        if (usuarioGuardado) {
+            document.getElementById('user-display').innerText = usuarioGuardado;
+            document.getElementById('login-overlay').style.display = 'none';
+        }
+
+        renderizarUI();
+    </script>
+
+<div id="simulador-impacto" style="position:fixed; bottom:20px; right:20px; width:310px; background:#ffffff; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.18); padding:16px; z-index:9999; font-family:system-ui, -apple-system, sans-serif; border-top:5px solid #16a34a;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <h3 style="margin:0; font-size:15px; color:#14532d;">♻️ Simulador de Impacto</h3>
+    <button onclick="document.getElementById('sim-body').style.display = document.getElementById('sim-body').style.display === 'none' ? 'block' : 'none'" style="background:#dcfce7; border:none; border-radius:6px; padding:2px 8px; cursor:pointer; font-weight:bold; color:#166534;">—</button>
+  </div>
+  <div id="sim-body">
+    <label style="font-size:12px; font-weight:600; color:#374151; display:block;">
+      Días de jornada de limpieza: <span id="val-dias" style="color:#16a34a;">7</span> días
+    </label>
+    <input type="range" id="inp-dias" min="1" max="30" value="7" oninput="actualizarSimulador()" style="width:100%; accent-color:#16a34a; margin:6px 0 12px 0;">
+
+    <label style="font-size:12px; font-weight:600; color:#374151; display:block;">
+      Participación ciudadana: <span id="val-part" style="color:#16a34a;">25</span>%
+    </label>
+    <input type="range" id="inp-part" min="1" max="100" value="25" oninput="actualizarSimulador()" style="width:100%; accent-color:#16a34a; margin:6px 0 14px 0;">
+
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:12px; text-align:center;">
+      <div style="font-size:11px; text-transform:uppercase; color:#166534; font-weight:700;">Basura estimada a recolectar</div>
+      <div id="res-toneladas" style="font-size:26px; font-weight:800; color:#15803d; margin:4px 0;">14.0 Toneladas</div>
+      <div style="background:#dcfce7; height:10px; border-radius:999px; overflow:hidden; margin:8px 0;">
+        <div id="barra-impacto" style="width:35%; height:100%; background:#16a34a; transition:width 0.3s;"></div>
+      </div>
+      <div id="res-puntos" style="font-size:12px; color:#166534;">Equivale a limpiar <b>7 de 20</b> puntos críticos</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function actualizarSimulador() {
+  const dias = parseInt(document.getElementById('inp-dias').value);
+  const part = parseInt(document.getElementById('inp-part').value);
+  document.getElementById('val-dias').innerText = dias;
+  document.getElementById('val-part').innerText = part;
+
+  // Estimación base: hasta 8 toneladas/día con 100% de participación en los 20 puntos de Sullana
+  const toneladas = (dias * (part / 100) * 8).toFixed(1);
+  const porcentajeLimpieza = Math.min(100, Math.round((toneladas / 40) * 100));
+  const puntosLimpios = Math.min(20, Math.round((porcentajeLimpieza / 100) * 20));
+
+  document.getElementById('res-toneladas').innerText = toneladas + " Toneladas";
+  document.getElementById('barra-impacto').style.width = porcentajeLimpieza + "%";
+  document.getElementById('res-puntos').innerHTML = `Equivale a limpiar <b>${puntosLimpios} de 20</b> puntos críticos (${porcentajeLimpieza}%)`;
+}
+actualizarSimulador();
+</script>
+
+</body>
+</html>
