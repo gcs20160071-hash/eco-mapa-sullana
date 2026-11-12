@@ -694,5 +694,52 @@
 
         renderizarUI();
     </script>
+
+<div id="simulador-impacto" style="position:fixed; bottom:20px; right:20px; width:310px; background:#ffffff; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.18); padding:16px; z-index:9999; font-family:system-ui, -apple-system, sans-serif; border-top:5px solid #16a34a;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <h3 style="margin:0; font-size:15px; color:#14532d;">♻️ Simulador de Impacto</h3>
+    <button onclick="document.getElementById('sim-body').style.display = document.getElementById('sim-body').style.display === 'none' ? 'block' : 'none'" style="background:#dcfce7; border:none; border-radius:6px; padding:2px 8px; cursor:pointer; font-weight:bold; color:#166534;">—</button>
+  </div>
+  <div id="sim-body">
+    <label style="font-size:12px; font-weight:600; color:#374151; display:block;">
+      Días de jornada de limpieza: <span id="val-dias" style="color:#16a34a;">7</span> días
+    </label>
+    <input type="range" id="inp-dias" min="1" max="30" value="7" oninput="actualizarSimulador()" style="width:100%; accent-color:#16a34a; margin:6px 0 12px 0;">
+
+    <label style="font-size:12px; font-weight:600; color:#374151; display:block;">
+      Participación ciudadana: <span id="val-part" style="color:#16a34a;">25</span>%
+    </label>
+    <input type="range" id="inp-part" min="1" max="100" value="25" oninput="actualizarSimulador()" style="width:100%; accent-color:#16a34a; margin:6px 0 14px 0;">
+
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:12px; text-align:center;">
+      <div style="font-size:11px; text-transform:uppercase; color:#166534; font-weight:700;">Basura estimada a recolectar</div>
+      <div id="res-toneladas" style="font-size:26px; font-weight:800; color:#15803d; margin:4px 0;">14.0 Toneladas</div>
+      <div style="background:#dcfce7; height:10px; border-radius:999px; overflow:hidden; margin:8px 0;">
+        <div id="barra-impacto" style="width:35%; height:100%; background:#16a34a; transition:width 0.3s;"></div>
+      </div>
+      <div id="res-puntos" style="font-size:12px; color:#166534;">Equivale a limpiar <b>7 de 20</b> puntos críticos</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function actualizarSimulador() {
+  const dias = parseInt(document.getElementById('inp-dias').value);
+  const part = parseInt(document.getElementById('inp-part').value);
+  document.getElementById('val-dias').innerText = dias;
+  document.getElementById('val-part').innerText = part;
+
+  // Estimación base: hasta 8 toneladas/día con 100% de participación en los 20 puntos de Sullana
+  const toneladas = (dias * (part / 100) * 8).toFixed(1);
+  const porcentajeLimpieza = Math.min(100, Math.round((toneladas / 40) * 100));
+  const puntosLimpios = Math.min(20, Math.round((porcentajeLimpieza / 100) * 20));
+
+  document.getElementById('res-toneladas').innerText = toneladas + " Toneladas";
+  document.getElementById('barra-impacto').style.width = porcentajeLimpieza + "%";
+  document.getElementById('res-puntos').innerHTML = `Equivale a limpiar <b>${puntosLimpios} de 20</b> puntos críticos (${porcentajeLimpieza}%)`;
+}
+actualizarSimulador();
+</script>
+
 </body>
 </html>
